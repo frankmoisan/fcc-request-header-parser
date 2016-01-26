@@ -1,33 +1,28 @@
 'use strict';
 
 var express = require('express');
-var routes = require('./app/routes/index.js');
-var mongoose = require('mongoose');
-var passport = require('passport');
-var session = require('express-session');
-
+var os = require('os');
+var path = require('path');
+var accepts = require('accepts');
+var uaparser = require('ua-parser-js');
 var app = express();
-require('dotenv').load();
-require('./app/config/passport')(passport);
+app.enable('trust proxy');
+var result = {ipaddress: null, locale: null, environment: null};
 
-mongoose.connect(process.env.MONGO_URI);
 
-app.use('/controllers', express.static(process.cwd() + '/app/controllers'));
-app.use('/public', express.static(process.cwd() + '/public'));
-app.use('/common', express.static(process.cwd() + '/app/common'));
-
-app.use(session({
-	secret: 'secretClementine',
-	resave: false,
-	saveUninitialized: true
-}));
-
-app.use(passport.initialize());
-app.use(passport.session());
-
-routes(app, passport);
-
-var port = process.env.PORT || 8080;
-app.listen(port,  function () {
-	console.log('Node.js listening on port ' + port + '...');
+app.get('/whoami', function(req, res) {
+	var ua = uaparser(req.headers['user-agent']);
+	
+	result.ipaddress = req.ip || req.connection.remoteAddress;
+	result.locale = accepts(req).languages()[0];
+	result.environment = ua.os.name + ' ' + ua.os.version + ' ' + ua.cpu.architecture;
+	
+	res.writeHead(200, { 'Content-Type': 'application/json'});
+	res.end(JSON.stringify(result));
 });
+
+app.get('/', function (req, res) {
+	res.sendFile(path.join(__dirname + '/public/index.html'));
+});
+
+app.listen(process.env.PORT || 8080 || 5000);
